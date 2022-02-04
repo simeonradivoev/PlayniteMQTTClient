@@ -1,4 +1,4 @@
-# MQTT Client Extension for Playnite
+# <img src="https://raw.githubusercontent.com/simeonradivoev/PlayniteMQTTClient/master/Source/Resources/icon.png" width="32"> MQTT Client Extension for Playnite
 This extension posts different topics to MQTT server. They include:
 * Selected Game
 	* Cover Image (optional)
