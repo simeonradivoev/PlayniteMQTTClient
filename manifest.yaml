@@ -1,8 +1,8 @@
 AddonId: MQTTClient_90c44048-4f8f-43f7-a0c1-f8164bf1d7ef
 Packages:
-    - Version: 1.0.1
+  - Version: 1.0.1
     RequiredApiVersion: 6.0.0
     ReleaseDate: 2022-02-10
     PackageUrl: https://github.com/simeonradivoev/PlayniteMQTTClient/releases/download/v1.0.1/MQTTClient_90c44048-4f8f-43f7-a0c1-f8164bf1d7ef_1_0_1.pext
     Changelog:
-        - Fixed json library version to be the same as playnite
+      - Fixed json library version to be the same as playnite
