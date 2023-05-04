@@ -1,5 +1,6 @@
 ﻿
 using ColorThiefDotNet;
+using Microsoft.Win32;
 using MQTTClient.Discovery;
 using MQTTClient.Helpers;
 using MQTTnet;
@@ -34,8 +35,6 @@ namespace MQTTClient
 
         private readonly List<SidebarItem> sidebarItems;
 
-        private readonly SidebarItem progressSidebar;
-
         private readonly MqttClient client;
 
         private readonly MQTTClientSettingsViewModel settings;
@@ -48,6 +47,12 @@ namespace MQTTClient
 
         private readonly ObjectSerializer serializer;
 
+        private readonly CancellationTokenSource applicationClosingCompletionSource;
+
+        private readonly IProgress<float> sidebarProgress;
+
+        private readonly IProgress<ConnectionState> connectedState;
+
         public MQTTClient(IPlayniteAPI api) : base(api)
         {
             serializer = new ObjectSerializer();
@@ -57,21 +62,42 @@ namespace MQTTClient
                 HasSettings = true
             };
 
+            applicationClosingCompletionSource = new CancellationTokenSource();
             client = new MqttFactory().CreateMqttClient();
             topicHelper = new TopicHelper(client, settings);
             discoveryModule = new DiscoveryModule(settings, PlayniteApi, topicHelper, client, serializer);
             colorThief = new ColorThief();
-            progressSidebar = new SidebarItem
+            var progressSidebar = new SidebarItem
             {
                 Visible = true,
-                Title = "MQTT",
                 Icon = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Resources", "icon.png"),
-                Activated = SideButtonActivated
+                Activated = SideButtonActivated,
+                ProgressMaximum = 1
             };
             sidebarItems = new List<SidebarItem>
             {
                 progressSidebar
             };
+            sidebarProgress = new Progress<float>(progress => progressSidebar.ProgressValue = progress);
+            connectedState = new Progress<ConnectionState>(v =>
+            {
+                switch (v)
+                {
+
+                    case ConnectionState.Disconnected:
+                        progressSidebar.Title = "MQTT (disconnected)";
+                        break;
+                    case ConnectionState.Connected:
+                        progressSidebar.Title = "MQTT (connected)";
+                        break;
+                    case ConnectionState.Connecting:
+                        progressSidebar.Title = "MQTT (connecting)";
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(v), v, null);
+                }
+            });
+            connectedState.Report(ConnectionState.Disconnected);
             mainMenuItems = new List<MainMenuItem>
             {
                 new MainMenuItem
@@ -112,8 +138,43 @@ namespace MQTTClient
             return task;
         }
 
+        public async Task<MqttClientConnectResult> StartConnectionTask(bool notifyCompletion, IProgress<float> progress = null,CancellationToken cancellationToken = default)
+        {
+            var optionsUnBuilt = new MqttClientOptionsBuilder().WithClientId(settings.Settings.ClientId)
+                .WithTcpServer(settings.Settings.ServerAddress, settings.Settings.Port)
+                .WithCredentials(settings.Settings.Username, LoadPassword())
+                .WithCleanSession();
+
+            if (settings.Settings.UseSecureConnection)
+            {
+                optionsUnBuilt = optionsUnBuilt.WithTls();
+            }
+
+            var options = optionsUnBuilt.Build();
+            try
+            {
+                progress?.Report(0.1f);
+                var connectionResult = await client.ConnectAsync(options, cancellationToken);
+                if (notifyCompletion && client.IsConnected)
+                {
+                    PlayniteApi.Dialogs.ShowMessage("MQTT Connected");
+                }
+
+                return connectionResult;
+            }
+            catch (Exception e)
+            {
+                PlayniteApi.Dialogs.ShowErrorMessage(
+                    $"MQTT: {e.Message}",
+                    "MQTT Error");
+            }
+
+            return null;
+        }
+
         public GlobalProgressResult StartConnection(bool notifyCompletion = false)
         {
+            connectedState.Report(ConnectionState.Connecting);
             if (client.IsConnected)
             {
                 PlayniteApi.Notifications.Add(
@@ -124,39 +185,9 @@ namespace MQTTClient
             return PlayniteApi.Dialogs.ActivateGlobalProgress(
                 args =>
                 {
-                    args.CurrentProgressValue = -1;
-                    var optionsUnBuilt = new MqttClientOptionsBuilder().WithClientId(settings.Settings.ClientId)
-                        .WithTcpServer(settings.Settings.ServerAddress, settings.Settings.Port)
-                        .WithCredentials(settings.Settings.Username, LoadPassword())
-                        .WithCleanSession();
-
-                    if (settings.Settings.UseSecureConnection)
-                    {
-                        optionsUnBuilt = optionsUnBuilt.WithTls();
-                    }
-
-                    var options = optionsUnBuilt.Build();
-
-                    client.ConnectAsync(options, args.CancelToken)
-                        .ContinueWith(
-                            t =>
-                            {
-                                if (t.Exception != null)
-                                {
-                                    PlayniteApi.Dialogs.ShowErrorMessage(
-                                        $"MQTT: {string.Join(",", t.Exception.InnerExceptions.Select(i => i.Message))}",
-                                        "MQTT Error");
-                                }
-                                else
-                                {
-                                    if (notifyCompletion && client.IsConnected)
-                                    {
-                                        PlayniteApi.Dialogs.ShowMessage("MQTT Connected");
-                                    }
-                                }
-                            },
-                            args.CancelToken)
-                        .Wait(args.CancelToken);
+                    args.ProgressMaxValue = 1;
+                    args.CurrentProgressValue = 0;
+                    StartConnectionTask(notifyCompletion, sidebarProgress,args.CancelToken).ContinueWith(t => args.CurrentProgressValue = 1,args.CancelToken);
                 },
                 new GlobalProgressOptions($"Connection to MQTT ({settings.Settings.ServerAddress}:{settings.Settings.Port})", true));
         }
@@ -185,21 +216,30 @@ namespace MQTTClient
 
         private async Task ClientOnConnectedAsync(EventArgs eventArgs)
         {
-            progressSidebar.ProgressValue = 100;
+            sidebarProgress.Report(0.6f);
 
             if (topicHelper.TryGetTopic(Topics.ConnectionSubTopic, out var connectionTopic))
             {
-                await client.PublishStringAsync(connectionTopic, "online", retain: true);
+                await client.PublishStringAsync(connectionTopic, "online", cancellationToken: applicationClosingCompletionSource.Token, retain: true);
             }
 
-            await UpdateSelectedGames(PlayniteApi.MainView.SelectedGames);
+            sidebarProgress.Report(0.7f);
+
+            await UpdateSelectedGames(PlayniteApi.MainView.SelectedGames,applicationClosingCompletionSource.Token);
+
+            sidebarProgress.Report(0.8f);
 
             if (topicHelper.TryGetTopic(Topics.ActiveViewSubTopic, out var activeViewTopic))
             {
-                await client.PublishStringAsync(activeViewTopic, PlayniteApi.MainView.ActiveDesktopView.ToString());
+                await client.PublishStringAsync(activeViewTopic, PlayniteApi.MainView.ActiveDesktopView.ToString(),cancellationToken:applicationClosingCompletionSource.Token);
             }
 
+            sidebarProgress.Report(0.9f);
+
             await discoveryModule.Initialize();
+
+            sidebarProgress.Report(1f);
+            connectedState.Report(ConnectionState.Connected);
         }
 
         private void DisconnectMenuAction(MainMenuItemActionArgs obj)
@@ -209,12 +249,13 @@ namespace MQTTClient
 
         private void ReconnectMenuAction(MainMenuItemActionArgs obj)
         {
-            StartDisconnect().ContinueWith(r => StartConnection(true)).Wait();
+            StartDisconnect().ContinueWith(r => StartConnection(true)).Wait(applicationClosingCompletionSource.Token);
         }
 
         private Task ClientOnDisconnectedAsync(EventArgs eventArgs)
         {
-            progressSidebar.ProgressValue = -1;
+            connectedState.Report(ConnectionState.Disconnected);
+            sidebarProgress.Report(-1);
             return Task.CompletedTask;
         }
 
@@ -266,7 +307,7 @@ namespace MQTTClient
             return null;
         }
 
-        private async Task PublishGame(string topic, Game game, ArraySegment<byte>? coverData, bool retain)
+        private async Task PublishGame(string topic, Game game, ArraySegment<byte>? coverData, bool retain, CancellationToken cancellationToken = default)
         {
             var color = new ColorThiefDotNet.Color();
             if (settings.Settings.PublishCoverColors)
@@ -280,10 +321,10 @@ namespace MQTTClient
                 }
             }
 
-            await client.PublishStringAsync(topic, serializer.Serialize(new GameData(game, color)), retain: retain);
+            await client.PublishStringAsync(topic, serializer.Serialize(new GameData(game, color)), retain: retain,cancellationToken:cancellationToken);
         }
 
-        private async Task UpdateSelectedGames(IEnumerable<Game> selectedGames)
+        private async Task UpdateSelectedGames(IEnumerable<Game> selectedGames,CancellationToken cancellationToken = default)
         {
             var first = selectedGames.FirstOrDefault();
             if (first != null)
@@ -292,9 +333,9 @@ namespace MQTTClient
                     topicHelper.TryGetTopic(Topics.SelectedGameAttributesSubTopic, out var attributesTopic) &&
                     topicHelper.TryGetTopic(Topics.SelectedGameCoverSubTopic, out var selectedGameCoverSubTopic))
                 {
-                    await client.PublishStringAsync(statusTopic, "online", retain: true);
+                    await client.PublishStringAsync(statusTopic, "online", retain: true, cancellationToken: cancellationToken);
                     var cover = settings.Settings.PublishCover || settings.Settings.PublishCoverColors ? await GetCoverData(first.CoverImage) : null;
-                    await PublishGame(attributesTopic, first, cover, true);
+                    await PublishGame(attributesTopic, first, cover, true,cancellationToken);
 
                     if (settings.Settings.PublishCover)
                     {
@@ -304,7 +345,7 @@ namespace MQTTClient
                         }
                         if (cover.HasValue)
                         {
-                            await client.PublishBinaryAsync(selectedGameCoverSubTopic, cover.Value, retain: true);
+                            await client.PublishBinaryAsync(selectedGameCoverSubTopic, cover.Value, retain: true, cancellationToken:cancellationToken);
                         }
                     }
                 }
@@ -315,9 +356,9 @@ namespace MQTTClient
                     topicHelper.TryGetTopic(Topics.SelectedGameAttributesSubTopic, out var attributesTopic) &&
                     topicHelper.TryGetTopic(Topics.SelectedGameCoverSubTopic, out var selectedGameCoverSubTopic))
                 {
-                    await client.PublishStringAsync(statusTopic, "offline", retain: true);
-                    await client.PublishStringAsync(attributesTopic, retain: true);
-                    await PublishFileAsync(selectedGameCoverSubTopic, retain: true);
+                    await client.PublishStringAsync(statusTopic, "offline", retain: true, cancellationToken: cancellationToken);
+                    await client.PublishStringAsync(attributesTopic, retain: true,cancellationToken: cancellationToken);
+                    await PublishFileAsync(selectedGameCoverSubTopic, retain: true, cancellationToken:cancellationToken);
                 }
             }
         }
@@ -353,7 +394,7 @@ namespace MQTTClient
                         topic,
                         args.Game,
                         settings.Settings.PublishCover ? await GetCoverData(args.Game.CoverImage) : null,
-                        false));
+                        false),applicationClosingCompletionSource.Token);
             }
         }
 
@@ -361,7 +402,7 @@ namespace MQTTClient
         {
             if (topicHelper.TryGetTopic(Topics.CurrentStateSubTopic, out var topic))
             {
-                client.PublishStringAsync(topic, "ON", retain: true);
+                Task.Run(() => client.PublishStringAsync(topic, "ON", retain: true,cancellationToken:applicationClosingCompletionSource.Token),applicationClosingCompletionSource.Token);
             }
         }
 
@@ -373,22 +414,22 @@ namespace MQTTClient
                 topicHelper.TryGetTopic(Topics.CurrentBackgroundSubTopic, out var currentBackgroundTopic) &&
                 topicHelper.TryGetTopic(Topics.CurrentIconTopic, out var iconTopic))
             {
-                tasks = tasks.ContinueWith(async t => await PublishGame(dataTopic, args.Game, await GetCoverData(args.Game.CoverImage), true));
+                tasks = tasks.ContinueWith(async t => await PublishGame(dataTopic, args.Game, await GetCoverData(args.Game.CoverImage), true,applicationClosingCompletionSource.Token));
                 tasks = tasks.ContinueWith(
                     async t => await PublishFileAsync(
                         currentCoverTopic,
                         args.Game.CoverImage ?? args.Game.Platforms.FirstOrDefault(p => !string.IsNullOrEmpty(p.Cover))?.Cover,
-                        retain: true));
+                        retain: true,cancellationToken:applicationClosingCompletionSource.Token));
                 tasks = tasks.ContinueWith(
                     async t => await PublishFileAsync(
                         currentBackgroundTopic,
                         args.Game.BackgroundImage ?? args.Game.Platforms.FirstOrDefault(p => !string.IsNullOrEmpty(p.Background))?.Background,
-                        retain: true));
+                        retain: true,cancellationToken:applicationClosingCompletionSource.Token));
                 tasks = tasks.ContinueWith(
                     async t => await PublishFileAsync(
                         iconTopic,
                         args.Game.Icon ?? args.Game.Platforms.FirstOrDefault(p => !string.IsNullOrEmpty(p.Icon))?.Icon,
-                        retain: true));
+                        retain: true,cancellationToken: applicationClosingCompletionSource.Token));
             }
         }
 
@@ -397,7 +438,7 @@ namespace MQTTClient
             var tasks = Task.CompletedTask;
             if (topicHelper.TryGetTopic(Topics.CurrentStateSubTopic, out var stageTopic))
             {
-                tasks = tasks.ContinueWith(async t => await client.PublishStringAsync(stageTopic, "OFF", retain: true));
+                tasks = tasks.ContinueWith(async t => await client.PublishStringAsync(stageTopic, "OFF", retain: true,cancellationToken:applicationClosingCompletionSource.Token));
             }
 
             if (topicHelper.TryGetTopic(Topics.CurrentAttributesSubTopic, out var dataTopic) &&
@@ -405,10 +446,10 @@ namespace MQTTClient
                 topicHelper.TryGetTopic(Topics.CurrentBackgroundSubTopic, out var currentBackgroundTopic) &&
                 topicHelper.TryGetTopic(Topics.CurrentIconTopic, out var iconTopic))
             {
-                tasks.ContinueWith(async t => await client.PublishStringAsync(dataTopic, retain: true));
-                tasks.ContinueWith(async t => await client.PublishStringAsync(currentCoverTopic, retain: true));
-                tasks.ContinueWith(async t => await client.PublishStringAsync(currentBackgroundTopic, retain: true));
-                tasks.ContinueWith(async t => await client.PublishStringAsync(iconTopic, retain: true));
+                tasks.ContinueWith(async t => await client.PublishStringAsync(dataTopic, retain: true,cancellationToken:applicationClosingCompletionSource.Token));
+                tasks.ContinueWith(async t => await client.PublishStringAsync(currentCoverTopic, retain: true,cancellationToken:applicationClosingCompletionSource.Token));
+                tasks.ContinueWith(async t => await client.PublishStringAsync(currentBackgroundTopic, retain: true, cancellationToken: applicationClosingCompletionSource.Token));
+                tasks.ContinueWith(async t => await client.PublishStringAsync(iconTopic, retain: true, cancellationToken: applicationClosingCompletionSource.Token));
             }
         }
 
@@ -428,20 +469,60 @@ namespace MQTTClient
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             client.ConnectedAsync += ClientOnConnectedAsync;
+            client.ConnectingAsync += ClientOnConnectingAsync;
             client.DisconnectedAsync += ClientOnDisconnectedAsync;
-            StartConnection();
+            SystemEvents.PowerModeChanged += SystemEventsOnPowerModeChanged;
+            if (settings.Settings.ShowProgress)
+            {
+                StartConnection();
+            }
+            else
+            {
+                Task.Run(async () =>
+                {
+                    var sidebarItem = sidebarItems.First();
+                    sidebarItem.ProgressMaximum = 1;
+                    sidebarItem.ProgressValue = 0;
+                    try
+                    {
+                        await StartConnectionTask(false, cancellationToken:applicationClosingCompletionSource.Token);
+                    }
+                    finally
+                    {
+                        sidebarItem.ProgressValue = 1;
+                    }
+                });
+            }
+        }
+
+        private Task ClientOnConnectingAsync(MqttClientConnectingEventArgs arg)
+        {
+            sidebarProgress.Report(0.5f);
+            return Task.CompletedTask;
+        }
+
+        private void SystemEventsOnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
+        {
+            if (e.Mode == PowerModes.Resume && !client.IsConnected)
+            {
+                StartConnection();
+            }
         }
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
         {
             client.ConnectedAsync -= ClientOnConnectedAsync;
+            client.ConnectingAsync -= ClientOnConnectingAsync;
             client.DisconnectedAsync -= ClientOnDisconnectedAsync;
-            StartDisconnect();
+            SystemEvents.PowerModeChanged -= SystemEventsOnPowerModeChanged;
+            StartDisconnect().Wait();
+            applicationClosingCompletionSource.Cancel();
+            applicationClosingCompletionSource.Dispose();
         }
 
         public override void OnGameSelected(OnGameSelectedEventArgs args)
         {
-            Task.Run(() => UpdateSelectedGames(args.NewValue));
+            Task.Run(() => UpdateSelectedGames(args.NewValue,applicationClosingCompletionSource.Token));
         }
 
         public override IEnumerable<SidebarItem> GetSidebarItems()
@@ -465,5 +546,12 @@ namespace MQTTClient
         }
 
         #endregion
+
+        private enum ConnectionState
+        {
+            Disconnected,
+            Connected,
+            Connecting
+        }
     }
 }

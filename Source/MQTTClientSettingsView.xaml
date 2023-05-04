@@ -33,6 +33,10 @@
                         <TextBox Text="{Binding Settings.Username}" />
                         <TextBlock Text="Password:" />
                         <PasswordBox Name="PasswordBox" PasswordChanged="PasswordBox_OnPasswordChanged" />
+                        <StackPanel Orientation="Horizontal" ToolTip="Should a popup showing progress and allowing canceling show on each playnite start.">
+                            <CheckBox IsChecked="{Binding Settings.ShowProgress}" Margin="5"></CheckBox>
+                            <TextBlock Text="Show Progress On Startup:" VerticalAlignment="Center" />
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

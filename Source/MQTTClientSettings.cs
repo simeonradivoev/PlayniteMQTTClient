@@ -31,6 +31,8 @@ namespace MQTTClient
         private bool publishCover = true;
 
         private bool publishBackground = false;
+
+        private bool showProgress = true;
         
         public string ClientId
         {
@@ -102,6 +104,12 @@ namespace MQTTClient
         {
             get => publishBackground;
             set => SetValue(ref publishBackground, value);
+        }
+
+        public bool ShowProgress
+        {
+            get => showProgress;
+            set => SetValue(ref showProgress, value);
         }
     }
 

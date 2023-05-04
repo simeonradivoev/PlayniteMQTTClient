@@ -1,5 +1,12 @@
 AddonId: MQTTClient_90c44048-4f8f-43f7-a0c1-f8164bf1d7ef
 Packages:
+  - Version: 1.1.0
+    RequiredApiVersion: 6.0.0
+    ReleaseDate: 2023-05-04
+    PackageUrl: https://github.com/simeonradivoev/PlayniteMQTTClient/releases/download/v1.0.1/MQTTClient_90c44048-4f8f-43f7-a0c1-f8164bf1d7ef_1_1_0.pext
+    Changelog:
+      - Added automatic connection on machine wakeup
+      - Added option to not display progress par on auto startup
   - Version: 1.0.1
     RequiredApiVersion: 6.0.0
     ReleaseDate: 2022-02-10
