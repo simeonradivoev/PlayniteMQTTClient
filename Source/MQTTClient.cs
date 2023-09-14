@@ -53,6 +53,8 @@ namespace MQTTClient
 
         private readonly IProgress<ConnectionState> connectedState;
 
+        private PowerModes lastPowerMode;
+
         public MQTTClient(IPlayniteAPI api) : base(api)
         {
             serializer = new ObjectSerializer();
@@ -67,6 +69,7 @@ namespace MQTTClient
             topicHelper = new TopicHelper(client, settings);
             discoveryModule = new DiscoveryModule(settings, PlayniteApi, topicHelper, client, serializer);
             colorThief = new ColorThief();
+            
             var progressSidebar = new SidebarItem
             {
                 Visible = true,
@@ -159,6 +162,10 @@ namespace MQTTClient
                 {
                     PlayniteApi.Dialogs.ShowMessage("MQTT Connected");
                 }
+                if (client.IsConnected)
+                {
+                    logger.Debug("MQTT Connected");
+                }
 
                 return connectionResult;
             }
@@ -187,7 +194,7 @@ namespace MQTTClient
                 {
                     args.ProgressMaxValue = 1;
                     args.CurrentProgressValue = 0;
-                    StartConnectionTask(notifyCompletion, sidebarProgress,args.CancelToken).ContinueWith(t => args.CurrentProgressValue = 1,args.CancelToken);
+                    StartConnectionTask(notifyCompletion, sidebarProgress, args.CancelToken).ContinueWith(t => args.CurrentProgressValue = 1,args.CancelToken);
                 },
                 new GlobalProgressOptions($"Connection to MQTT ({settings.Settings.ServerAddress}:{settings.Settings.Port})", true));
         }
@@ -256,6 +263,29 @@ namespace MQTTClient
         {
             connectedState.Report(ConnectionState.Disconnected);
             sidebarProgress.Report(-1);
+
+            logger.Debug("MQTT client disconnected.");
+            if (lastPowerMode == PowerModes.Resume)
+            {
+                logger.Debug("Last power modes is Resume. Connecting...");
+                Task.Run(async () =>
+                {
+                    var sidebarItem = sidebarItems.First();
+                    sidebarItem.ProgressMaximum = 1;
+                    sidebarItem.ProgressValue = 0;
+                    try
+                    {
+                        await StartConnectionTask(false, cancellationToken: applicationClosingCompletionSource.Token);
+                        sidebarItem.ProgressValue = 1;
+                        logger.Debug("MQTT client reconnected after disconnect on power resume.");
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Debug($"MQTT reconnection failed on power resume. Exception: {ex}");
+                    }
+                });
+            }
+
             return Task.CompletedTask;
         }
 
@@ -503,10 +533,8 @@ namespace MQTTClient
 
         private void SystemEventsOnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
         {
-            if (e.Mode == PowerModes.Resume && !client.IsConnected)
-            {
-                StartConnection();
-            }
+            logger.Debug($"System power mode changed to: {e.Mode}");
+            lastPowerMode = e.Mode;
         }
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
