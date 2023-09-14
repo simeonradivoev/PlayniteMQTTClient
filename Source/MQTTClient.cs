@@ -6,7 +6,6 @@ using MQTTClient.Helpers;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Protocol;
-using Newtonsoft.Json;
 using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Models;
@@ -22,8 +21,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
-using Color = System.Drawing.Color;
-using Image = System.Drawing.Image;
 
 namespace MQTTClient
 {
