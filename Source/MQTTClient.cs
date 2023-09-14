@@ -65,7 +65,7 @@ namespace MQTTClient
             };
 
             applicationClosingCompletionSource = new CancellationTokenSource();
-            client = new MqttFactory().CreateMqttClient();
+            client = (MqttClient)new MqttFactory().CreateMqttClient();
             topicHelper = new TopicHelper(client, settings);
             discoveryModule = new DiscoveryModule(settings, PlayniteApi, topicHelper, client, serializer);
             colorThief = new ColorThief();
