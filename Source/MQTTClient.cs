@@ -150,7 +150,10 @@ namespace MQTTClient
 
             if (settings.Settings.UseSecureConnection)
             {
-                optionsUnBuilt = optionsUnBuilt.WithTls();
+                optionsUnBuilt = optionsUnBuilt.WithTlsOptions(o =>
+                {
+                    o.UseTls(true);
+                });
             }
 
             var options = optionsUnBuilt.Build();
