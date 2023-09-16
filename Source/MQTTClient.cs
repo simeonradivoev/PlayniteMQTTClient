@@ -535,6 +535,10 @@ namespace MQTTClient
         {
             logger.Debug($"System power mode changed to: {e.Mode}");
             lastPowerMode = e.Mode;
+            if (e.Mode == PowerModes.Resume && !client.IsConnected)
+            {
+                StartConnection();
+            }
         }
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
