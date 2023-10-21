@@ -8,3 +8,5 @@ Type: GenericPlugin
 Links:
   - Name: Website
     URL: https://simeonradivoev.com
+  - Name: Github
+    URL: https://github.com/simeonradivoev/PlayniteMQTTClient

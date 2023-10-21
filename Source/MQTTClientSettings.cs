@@ -33,7 +33,11 @@ namespace MQTTClient
         private bool publishBackground = false;
 
         private bool showProgress = true;
-        
+
+        private bool showStatusChanged = true;
+
+        private bool notifications = true;
+
         public string ClientId
         {
             get => clientId;
@@ -111,6 +115,18 @@ namespace MQTTClient
             get => showProgress;
             set => SetValue(ref showProgress, value);
         }
+
+        public bool ShowStatusChanged
+        {
+            get => showStatusChanged;
+            set => SetValue(ref showStatusChanged, value);
+        }
+
+        public bool Notifications
+        {
+            get => notifications;
+            set => SetValue(ref notifications, value);
+        }
     }
 
     public class MQTTClientSettingsViewModel : ObservableObject, ISettings
@@ -135,7 +151,7 @@ namespace MQTTClient
             this.plugin = plugin;
 
             // Load saved settings.
-            var savedSettings = plugin.LoadPluginSettings<MQTTClientSettings>();
+            MQTTClientSettings savedSettings = plugin.LoadPluginSettings<MQTTClientSettings>();
 
             // LoadPluginSettings returns null if not saved data is available.
             if (savedSettings != null)
