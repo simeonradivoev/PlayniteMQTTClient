@@ -1,10 +1,12 @@
 ﻿Id: MQTTClient_90c44048-4f8f-43f7-a0c1-f8164bf1d7ef
 Name: MQTT Client
 Author: Simeon Radivoev
-Version: 1.1.0
+Version: 1.2.0
 Icon: Resources/icon.png
 Module: MQTTClient.dll
 Type: GenericPlugin
 Links:
   - Name: Website
     URL: https://simeonradivoev.com
+  - Name: Github
+    URL: https://github.com/simeonradivoev/PlayniteMQTTClient

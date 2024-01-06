@@ -6,7 +6,6 @@ using MQTTClient.Helpers;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Protocol;
-using Newtonsoft.Json;
 using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Models;
@@ -22,8 +21,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
-using Color = System.Drawing.Color;
-using Image = System.Drawing.Image;
 
 namespace MQTTClient
 {
@@ -53,6 +50,8 @@ namespace MQTTClient
 
         private readonly IProgress<ConnectionState> connectedState;
 
+        private PowerModes lastPowerMode;
+
         public MQTTClient(IPlayniteAPI api) : base(api)
         {
             serializer = new ObjectSerializer();
@@ -63,10 +62,11 @@ namespace MQTTClient
             };
 
             applicationClosingCompletionSource = new CancellationTokenSource();
-            client = new MqttFactory().CreateMqttClient();
+            client = (MqttClient)new MqttFactory().CreateMqttClient();
             topicHelper = new TopicHelper(client, settings);
             discoveryModule = new DiscoveryModule(settings, PlayniteApi, topicHelper, client, serializer);
             colorThief = new ColorThief();
+            
             var progressSidebar = new SidebarItem
             {
                 Visible = true,
@@ -143,11 +143,14 @@ namespace MQTTClient
             var optionsUnBuilt = new MqttClientOptionsBuilder().WithClientId(settings.Settings.ClientId)
                 .WithTcpServer(settings.Settings.ServerAddress, settings.Settings.Port)
                 .WithCredentials(settings.Settings.Username, LoadPassword())
-                .WithCleanSession();
+                .WithCleanSession().WithKeepAlivePeriod(TimeSpan.FromSeconds(5));
 
             if (settings.Settings.UseSecureConnection)
             {
-                optionsUnBuilt = optionsUnBuilt.WithTls();
+                optionsUnBuilt = optionsUnBuilt.WithTlsOptions(o =>
+                {
+                    o.UseTls(true);
+                });
             }
 
             var options = optionsUnBuilt.Build();
@@ -158,6 +161,17 @@ namespace MQTTClient
                 if (notifyCompletion && client.IsConnected)
                 {
                     PlayniteApi.Dialogs.ShowMessage("MQTT Connected");
+                }
+                if (settings.Settings.Notifications && client.IsConnected)
+                {
+                    //PlayniteApi.Notifications.Add("MQTT Client", "MQTT Connected", NotificationType.Info);
+                    PlayniteApi.Notifications.Add(
+                        new NotificationMessage(Guid.NewGuid().ToString(), DateTime.Now.ToString("dd/MM/yyyy hh:mm:ss") + "\nMQTT Connected", NotificationType.Info)
+                    );
+                }
+                if (client.IsConnected)
+                {
+                    logger.Debug("MQTT Connected");
                 }
 
                 return connectionResult;
@@ -187,7 +201,7 @@ namespace MQTTClient
                 {
                     args.ProgressMaxValue = 1;
                     args.CurrentProgressValue = 0;
-                    StartConnectionTask(notifyCompletion, sidebarProgress,args.CancelToken).ContinueWith(t => args.CurrentProgressValue = 1,args.CancelToken);
+                    StartConnectionTask(notifyCompletion, sidebarProgress, args.CancelToken).ContinueWith(t => args.CurrentProgressValue = 1,args.CancelToken);
                 },
                 new GlobalProgressOptions($"Connection to MQTT ({settings.Settings.ServerAddress}:{settings.Settings.Port})", true));
         }
@@ -206,11 +220,25 @@ namespace MQTTClient
         {
             if (client.IsConnected)
             {
-                StartDisconnect(true);
+                StartDisconnect(settings.Settings.ShowStatusChanged).Wait(300);
+                if (settings.Settings.Notifications && !client.IsConnected)
+                {
+                    //PlayniteApi.Notifications.Add("MQTT Client", "MQTT Disconnected", NotificationType.Info);
+                    PlayniteApi.Notifications.Add(
+                        new NotificationMessage(Guid.NewGuid().ToString(), DateTime.Now.ToString("dd/MM/yyyy hh:mm:ss") + "\nMQTT Disconnected", NotificationType.Info)
+                    );
+                }
             }
             else
             {
-                StartConnection(true);
+                StartConnection(settings.Settings.ShowStatusChanged);
+                if (settings.Settings.Notifications && client.IsConnected)
+                {
+                    //PlayniteApi.Notifications.Add("MQTT Client", "MQTT Connected", NotificationType.Info);
+                    PlayniteApi.Notifications.Add(
+                        new NotificationMessage(Guid.NewGuid().ToString(), DateTime.Now.ToString("dd/MM/yyyy hh:mm:ss") + "\nMQTT Connected", NotificationType.Info)
+                    );
+                }
             }
         }
 
@@ -244,7 +272,21 @@ namespace MQTTClient
 
         private void DisconnectMenuAction(MainMenuItemActionArgs obj)
         {
-            StartDisconnect().ContinueWith(t => PlayniteApi.Dialogs.ShowMessage("MQTT Disconnected Successfully")).Wait(TimeSpan.FromSeconds(3));
+            if (settings.Settings.ShowStatusChanged)
+            {
+                StartDisconnect().ContinueWith(t => PlayniteApi.Dialogs.ShowMessage("MQTT Disconnected Successfully")).Wait(TimeSpan.FromSeconds(3));
+            }
+            else
+            {
+                StartDisconnect();
+            }
+
+            if (settings.Settings.Notifications) {
+                //PlayniteApi.Notifications.Add("MQTT Client", "MQTT Disconnected Successfully", NotificationType.Info);
+                PlayniteApi.Notifications.Add(
+                        new NotificationMessage(Guid.NewGuid().ToString(), DateTime.Now.ToString("dd/MM/yyyy hh:mm:ss") + "\nMQTT Disconnected Successfully", NotificationType.Info)
+                    );
+            }
         }
 
         private void ReconnectMenuAction(MainMenuItemActionArgs obj)
@@ -256,6 +298,30 @@ namespace MQTTClient
         {
             connectedState.Report(ConnectionState.Disconnected);
             sidebarProgress.Report(-1);
+
+            logger.Debug("MQTT client disconnected.");
+            if (lastPowerMode == PowerModes.Resume)
+            {
+                lastPowerMode = 0;
+                logger.Debug("Last power modes is Resume. Connecting...");
+                Task.Run(async () =>
+                {
+                    var sidebarItem = sidebarItems.First();
+                    sidebarItem.ProgressMaximum = 1;
+                    sidebarItem.ProgressValue = 0;
+                    try
+                    {
+                        await StartConnectionTask(false, cancellationToken: applicationClosingCompletionSource.Token);
+                        sidebarItem.ProgressValue = 1;
+                        logger.Debug("MQTT client reconnected after disconnect on power resume.");
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Debug($"MQTT reconnection failed on power resume. Exception: {ex}");
+                    }
+                });
+            }
+
             return Task.CompletedTask;
         }
 
@@ -503,6 +569,8 @@ namespace MQTTClient
 
         private void SystemEventsOnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
         {
+            logger.Debug($"System power mode changed to: {e.Mode}");
+            lastPowerMode = e.Mode;
             if (e.Mode == PowerModes.Resume && !client.IsConnected)
             {
                 StartConnection();

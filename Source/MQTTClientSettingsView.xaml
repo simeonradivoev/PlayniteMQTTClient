@@ -10,34 +10,55 @@
     <TabControl ClipToBounds="True" MaxHeight="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Panel}}, Path=ActualHeight, Mode=OneWay}">
             <TabItem Header="General">
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Margin="10">
-                        <TextBlock Text="Client Name:" />
-                        <TextBox Text="{Binding Settings.ClientId}" />
-                        <TextBlock Text="MQTT Server Address:" />
-                        <TextBox Text="{Binding Settings.ServerAddress}" />
-                        <StackPanel Orientation="Horizontal">
-                            <CheckBox IsChecked="{Binding Settings.UseSecureConnection}" Margin="5" />
-                            <TextBlock Text="Secure TCP Connection:" VerticalAlignment="Center" />
+                <StackPanel Margin="10">
+                    <GroupBox BorderThickness="2">
+                        <GroupBox.Header>
+                            <Label FontWeight="Bold">MQTT Client</Label>
+                        </GroupBox.Header>
+                        <StackPanel>
+                            <TextBlock Text="Client Name:" />
+                            <TextBox Text="{Binding Settings.ClientId}" />
                         </StackPanel>
-                        <TextBlock Text="MQTT Server Port:" />
-                        <TextBox PreviewTextInput="NumberValidationTextBox">
-                            <TextBox.Text>
-                                <Binding Path="Settings.Port"
-                                         UpdateSourceTrigger="PropertyChanged"
-                                         ValidatesOnDataErrors="True"
-                                         NotifyOnValidationError="True"
-                                         Converter="{mqttClient:NullableUIntToStringConverter}" />
-                            </TextBox.Text>
-                        </TextBox>
-                        <TextBlock Text="Username:" />
-                        <TextBox Text="{Binding Settings.Username}" />
-                        <TextBlock Text="Password:" />
-                        <PasswordBox Name="PasswordBox" PasswordChanged="PasswordBox_OnPasswordChanged" />
-                        <StackPanel Orientation="Horizontal" ToolTip="Should a popup showing progress and allowing canceling show on each playnite start.">
-                            <CheckBox IsChecked="{Binding Settings.ShowProgress}" Margin="5"></CheckBox>
-                            <TextBlock Text="Show Progress On Startup:" VerticalAlignment="Center" />
+                    </GroupBox>
+                    <GroupBox BorderThickness="2">
+                        <GroupBox.Header>
+                            <Label FontWeight="Bold">MQTT Server</Label>
+                        </GroupBox.Header>
+                        <StackPanel>
+                            <TextBlock Text="MQTT Server Address:" />
+                            <TextBox Text="{Binding Settings.ServerAddress}" />
+                            <TextBlock Text="MQTT Server Port:" />
+                            <TextBox PreviewTextInput="NumberValidationTextBox" Text="{Binding Settings.Port, Converter={mqttClient:NullableUIntToStringConverter}, NotifyOnValidationError=True, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"/>
+                            <StackPanel Orientation="Horizontal">
+                                <CheckBox IsChecked="{Binding Settings.UseSecureConnection}" Margin="5" />
+                                <TextBlock Text="Secure TCP Connection" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="Username:" />
+                            <TextBox Text="{Binding Settings.Username}" />
+                            <TextBlock Text="Password:" />
+                            <PasswordBox x:Name="PasswordBox" PasswordChanged="PasswordBox_OnPasswordChanged" />
                         </StackPanel>
-                    </StackPanel>
+                    </GroupBox>
+                    <GroupBox BorderThickness="2">
+                        <GroupBox.Header>
+                            <Label FontWeight="Bold">Display</Label>
+                        </GroupBox.Header>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" ToolTip="Should a popup showing progress and allowing canceling show on each playnite start.">
+                                <CheckBox IsChecked="{Binding Settings.ShowProgress}" Margin="5"/>
+                                <TextBlock Text="Show Progress On Startup" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" ToolTip="Should a popup showing status changed">
+                                <CheckBox IsChecked="{Binding Settings.ShowStatusChanged}" Margin="5"/>
+                                <TextBlock Text="Show Status Changed" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" ToolTip="Should a notification be created">
+                                <CheckBox IsChecked="{Binding Settings.Notifications}" Margin="5"/>
+                                <TextBlock Text="Notification" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
+                </StackPanel>
                 </ScrollViewer>
             </TabItem>
             <TabItem Header="Topics">
@@ -57,15 +78,15 @@
                     <StackPanel Margin="10">
                         <StackPanel Orientation="Horizontal" ToolTip="Should the dominant color of the cover be published as hue, saturation and brightness">
                             <CheckBox IsChecked="{Binding Settings.PublishCoverColors}" Margin="5"></CheckBox>
-                            <TextBlock Text="Publish Cover Colors:" VerticalAlignment="Center" />
+                            <TextBlock Text="Publish Cover Colors" VerticalAlignment="Center" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" ToolTip="Should the cover image be published for selected games and currently playing games">
                             <CheckBox IsChecked="{Binding Settings.PublishCover}" Margin="5"></CheckBox>
-                            <TextBlock Text="Publish Cover:" VerticalAlignment="Center" />
+                            <TextBlock Text="Publish Cover" VerticalAlignment="Center" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" ToolTip="Should the background image be published for currently playing games">
                             <CheckBox IsChecked="{Binding Settings.PublishBackground}" Margin="5"></CheckBox>
-                            <TextBlock Text="Publish Background:" VerticalAlignment="Center" />
+                            <TextBlock Text="Publish Background" VerticalAlignment="Center" />
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
