@@ -164,7 +164,10 @@ namespace MQTTClient
                 }
                 if (settings.Settings.Notifications && client.IsConnected)
                 {
-                    PlayniteApi.Notifications.Add("MQTT Client", "MQTT Connected", NotificationType.Info);
+                    //PlayniteApi.Notifications.Add("MQTT Client", "MQTT Connected", NotificationType.Info);
+                    PlayniteApi.Notifications.Add(
+                        new NotificationMessage(Guid.NewGuid().ToString(), DateTime.Now.ToString("dd/MM/yyyy hh:mm:ss") + "\nMQTT Connected", NotificationType.Info)
+                    );
                 }
                 if (client.IsConnected)
                 {
@@ -220,7 +223,10 @@ namespace MQTTClient
                 StartDisconnect(settings.Settings.ShowStatusChanged).Wait(300);
                 if (settings.Settings.Notifications && !client.IsConnected)
                 {
-                    PlayniteApi.Notifications.Add("MQTT Client", "MQTT Disconnected", NotificationType.Info);
+                    //PlayniteApi.Notifications.Add("MQTT Client", "MQTT Disconnected", NotificationType.Info);
+                    PlayniteApi.Notifications.Add(
+                        new NotificationMessage(Guid.NewGuid().ToString(), DateTime.Now.ToString("dd/MM/yyyy hh:mm:ss") + "\nMQTT Disconnected", NotificationType.Info)
+                    );
                 }
             }
             else
@@ -228,7 +234,10 @@ namespace MQTTClient
                 StartConnection(settings.Settings.ShowStatusChanged);
                 if (settings.Settings.Notifications && client.IsConnected)
                 {
-                    PlayniteApi.Notifications.Add("MQTT Client", "MQTT Connected", NotificationType.Info);
+                    //PlayniteApi.Notifications.Add("MQTT Client", "MQTT Connected", NotificationType.Info);
+                    PlayniteApi.Notifications.Add(
+                        new NotificationMessage(Guid.NewGuid().ToString(), DateTime.Now.ToString("dd/MM/yyyy hh:mm:ss") + "\nMQTT Connected", NotificationType.Info)
+                    );
                 }
             }
         }
@@ -272,8 +281,12 @@ namespace MQTTClient
                 StartDisconnect();
             }
 
-            if (settings.Settings.Notifications)
-                PlayniteApi.Notifications.Add("MQTT Client", "MQTT Disconnected Successfully", NotificationType.Info);
+            if (settings.Settings.Notifications) {
+                //PlayniteApi.Notifications.Add("MQTT Client", "MQTT Disconnected Successfully", NotificationType.Info);
+                PlayniteApi.Notifications.Add(
+                        new NotificationMessage(Guid.NewGuid().ToString(), DateTime.Now.ToString("dd/MM/yyyy hh:mm:ss") + "\nMQTT Disconnected Successfully", NotificationType.Info)
+                    );
+            }
         }
 
         private void ReconnectMenuAction(MainMenuItemActionArgs obj)
