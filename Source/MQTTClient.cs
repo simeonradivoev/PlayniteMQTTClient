@@ -150,7 +150,15 @@ namespace MQTTClient
             {
                 optionsUnBuilt = optionsUnBuilt.WithTlsOptions(o =>
                 {
-                    o.UseTls(true);
+                    o.UseTls();
+                    if (!string.IsNullOrEmpty(settings.Settings.CertificatePath) && File.Exists(settings.Settings.CertificatePath))
+                    {
+                        o.WithClientCertificates(
+                            new[]
+                            {
+                                new X509Certificate2(File.ReadAllBytes(settings.Settings.CertificatePath))
+                            });
+                    }
                 });
             }
 

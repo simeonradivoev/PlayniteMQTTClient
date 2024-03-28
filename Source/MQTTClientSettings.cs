@@ -17,6 +17,8 @@ namespace MQTTClient
         private string serverAdress = "localhost";
 
         private bool useSecureConnection;
+        
+        private string certificatePath;
 
         private string homeAssistantTopic = "homeassistant";
 
@@ -126,6 +128,11 @@ namespace MQTTClient
         {
             get => notifications;
             set => SetValue(ref notifications, value);
+        }
+        public string CertificatePath
+        {
+            get => certificatePath;
+            set => SetValue(ref certificatePath, value);
         }
     }
 

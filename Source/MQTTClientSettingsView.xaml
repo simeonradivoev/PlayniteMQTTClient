@@ -33,6 +33,8 @@
                                 <CheckBox IsChecked="{Binding Settings.UseSecureConnection}" Margin="5" />
                                 <TextBlock Text="Secure TCP Connection" VerticalAlignment="Center" />
                             </StackPanel>
+                            <TextBlock Text="Certificate Path:" />
+                            <TextBox Text="{Binding Settings.CertificatePath}" />
                             <TextBlock Text="Username:" />
                             <TextBox Text="{Binding Settings.Username}" />
                             <TextBlock Text="Password:" />
