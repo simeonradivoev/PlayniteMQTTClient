@@ -17,6 +17,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -130,7 +131,7 @@ namespace MQTTClient
                         {
                             if (notify && !client.IsConnected)
                             {
-                                PlayniteApi.Dialogs.ShowMessage("MQTT Disconnected");
+                                PlayniteApi.Dialogs.ShowMessage("MQTT Disconnected","MQTT Status");
                             }
                         });
             }
@@ -160,7 +161,7 @@ namespace MQTTClient
                 var connectionResult = await client.ConnectAsync(options, cancellationToken);
                 if (notifyCompletion && client.IsConnected)
                 {
-                    PlayniteApi.Dialogs.ShowMessage("MQTT Connected");
+                    PlayniteApi.Dialogs.ShowMessage("MQTT Connected","MQTT Status");
                 }
                 if (settings.Settings.Notifications && client.IsConnected)
                 {
@@ -405,7 +406,7 @@ namespace MQTTClient
 
                     if (settings.Settings.PublishCover)
                     {
-                        if (!cover.HasValue)
+                        if (!cover.HasValue && first.Platforms != null)
                         {
                             cover = await GetCoverData(first.Platforms.FirstOrDefault(p => !string.IsNullOrEmpty(p.Cover))?.Cover);
                         }
