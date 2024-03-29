@@ -153,11 +153,10 @@ namespace MQTTClient
                     o.UseTls();
                     if (!string.IsNullOrEmpty(settings.Settings.CertificatePath) && File.Exists(settings.Settings.CertificatePath))
                     {
-                        o.WithClientCertificates(
-                            new[]
-                            {
-                                new X509Certificate2(File.ReadAllBytes(settings.Settings.CertificatePath))
-                            });
+                        var caChain = new X509Certificate2Collection();
+                        caChain.Import(settings.Settings.CertificatePath);
+                        o.WithClientCertificates(caChain);
+                        o.WithRevocationMode(X509RevocationMode.NoCheck);
                     }
                 });
             }
