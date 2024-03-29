@@ -493,17 +493,17 @@ namespace MQTTClient
                 tasks = tasks.ContinueWith(
                     async t => await PublishFileAsync(
                         currentCoverTopic,
-                        args.Game.CoverImage ?? args.Game.Platforms.FirstOrDefault(p => !string.IsNullOrEmpty(p.Cover))?.Cover,
+                        args.Game.CoverImage ?? args.Game.Platforms?.FirstOrDefault(p => !string.IsNullOrEmpty(p.Cover))?.Cover,
                         retain: true,cancellationToken:applicationClosingCompletionSource.Token));
                 tasks = tasks.ContinueWith(
                     async t => await PublishFileAsync(
                         currentBackgroundTopic,
-                        args.Game.BackgroundImage ?? args.Game.Platforms.FirstOrDefault(p => !string.IsNullOrEmpty(p.Background))?.Background,
+                        args.Game.BackgroundImage ?? args.Game.Platforms?.FirstOrDefault(p => !string.IsNullOrEmpty(p.Background))?.Background,
                         retain: true,cancellationToken:applicationClosingCompletionSource.Token));
                 tasks = tasks.ContinueWith(
                     async t => await PublishFileAsync(
                         iconTopic,
-                        args.Game.Icon ?? args.Game.Platforms.FirstOrDefault(p => !string.IsNullOrEmpty(p.Icon))?.Icon,
+                        args.Game.Icon ?? args.Game.Platforms?.FirstOrDefault(p => !string.IsNullOrEmpty(p.Icon))?.Icon,
                         retain: true,cancellationToken: applicationClosingCompletionSource.Token));
             }
         }
